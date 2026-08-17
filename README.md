@@ -1,6 +1,6 @@
 # ADO Placemat
 
-Generate a "placemat" PowerPoint presentation from an Azure DevOps (ADO) work item query.
+Generate a "placemat" Keynote presentation from an Azure DevOps (ADO) work item query.
 
 Each slide represents a **parent Epic and team** and contains a table of its
 **child Epics** for that team:
