@@ -80,15 +80,32 @@ async function main(): Promise<void> {
     return;
   }
 
-  const items = await client.getWorkItems(ids, true);
-
   if (parsed.reportOnly) {
-    const rows = collectScenarioLinks(items);
+    console.log("Running the relationship query for each Epic...");
+    const items = await client.getWorkItemsForReport(ids);
+    const queryIds = new Set(ids);
+    const queryItems = items.filter((item) => queryIds.has(item.id));
+    const reportEpicIds = new Set(
+      groupEpics(queryItems).flatMap((group) =>
+        group.children.map((child) => child.id)
+      )
+    );
+    console.log(`Found ${reportEpicIds.size} child Epic(s) for the report.`);
+    for (const item of queryItems) {
+      if (!reportEpicIds.has(item.id)) continue;
+      const relations = item.relations ?? [];
+      console.log(
+        `Epic ${item.id} (${item.title}) links: ${relations.length === 0 ? "none" : relations.map((r) => `${r.rel ?? "unknown"}:${r.url ?? ""}`).join(" | ")}`
+      );
+    }
+    const rows = collectScenarioLinks(items, undefined, reportEpicIds);
     const markdown = buildScenarioReportMarkdown(rows);
     await writeFile(parsed.out, markdown, "utf8");
     console.log(`Wrote report to ${parsed.out}`);
     return;
   }
+
+  const items = await client.getWorkItems(ids);
 
   const groups = groupEpics(items);
   console.log(

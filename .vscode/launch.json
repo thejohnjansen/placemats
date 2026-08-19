@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Placemat report",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "tsx",
+        "src/index.ts",
+        "https://dev.azure.com/microsoft/Edge/_queries/query/275acf64-c888-4b92-91cf-4e7f2c5a7980/",
+        "--report",
+        "--out",
+        "scenario-links.md"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "skipFiles": [
+        "<node_internals>/**"
+      ]
+    }
+  ]
+}

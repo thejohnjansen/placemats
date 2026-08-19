@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { buildScenarioReportMarkdown, classifyLinkType, collectScenarioLinks } from "./report.js";
-import { WorkItem } from "./types.js";
+import { WorkItem, WorkItemRelation } from "./types.js";
 
 test("classifyLinkType maps common Azure DevOps relation names", () => {
   assert.equal(classifyLinkType("System.LinkTypes.Related"), "related");
@@ -73,21 +73,88 @@ test("collectScenarioLinks finds scenario work item relations for child epics", 
     },
   ];
 
-  assert.deepEqual(collectScenarioLinks(items), [
-    { epicId: 101, epicTitle: "Epic One", scenarioId: 201, linkType: "related" },
-    { epicId: 102, epicTitle: "Epic Two", scenarioId: 202, linkType: "child" },
+  assert.deepEqual(collectScenarioLinks([...items, items[0]]), [
+    {
+      epicId: 101,
+      epicTitle: "Epic One",
+      epicState: "Active",
+      epicUrl: "https://example.test/_workitems/edit/101",
+      scenarios: [
+        { id: 201, url: "https://example.test/_workitems/edit/201", linkType: "related" },
+      ],
+      crBugs: [],
+    },
+    {
+      epicId: 102,
+      epicTitle: "Epic Two",
+      epicState: "Active",
+      epicUrl: "https://example.test/_workitems/edit/102",
+      scenarios: [
+        { id: 202, url: "https://example.test/_workitems/edit/202", linkType: "child" },
+      ],
+      crBugs: [],
+    },
   ]);
 });
 
-test("buildScenarioReportMarkdown renders table rows from collected links", () => {
+test("buildScenarioReportMarkdown renders linked IDs and multiple links on one row", () => {
   const markdown = buildScenarioReportMarkdown([
-    { epicId: 101, epicTitle: "Epic One", scenarioId: 201, linkType: "related" },
-    { epicId: 102, epicTitle: "Epic Two", scenarioId: 202, linkType: "child" },
+    {
+      epicId: 101,
+      epicTitle: "Epic One",
+      epicState: "Active",
+      epicUrl: "https://example.test/_workitems/edit/101",
+      scenarios: [
+        { id: 201, url: "https://example.test/_workitems/edit/201", linkType: "related" },
+        { id: 202, url: "https://example.test/_workitems/edit/202", linkType: "child" },
+      ],
+      crBugs: [
+        { url: "https://issues.chromium.org/issues/123456", linkType: "hyperlink" },
+        { url: "https://issues.chromium.org/issues/789012", linkType: "hyperlink" },
+      ],
+    },
   ]);
 
-  assert.match(markdown, /\| Epic ID \| Epic Title \| Scenario ID \| Link Type \|/);
-  assert.match(markdown, /\| 101 \| Epic One \| 201 \| related \|/);
-  assert.match(markdown, /\| 102 \| Epic Two \| 202 \| child \|/);
+  assert.match(markdown, /\| Epic ID \| Epic Title \| State \| Scenario ID \| CRBug \| Link Type \|/);
+  assert.match(markdown, /\| \[101\]\(https:\/\/example\.test\/_workitems\/edit\/101\) \| Epic One \| Active \|/);
+  assert.match(markdown, /\[201\]\(https:\/\/example\.test\/_workitems\/edit\/201\), \[202\]\(https:\/\/example\.test\/_workitems\/edit\/202\)/);
+  assert.match(markdown, /\[123456\]\(https:\/\/issues\.chromium\.org\/issues\/123456\), \[789012\]\(https:\/\/issues\.chromium\.org\/issues\/789012\)/);
+  assert.equal(markdown.split("\n").filter((line) => line.startsWith("| [101]")).length, 1);
+});
+
+test("collectScenarioLinks includes Chromium issue hyperlinks and ignores other hyperlinks", () => {
+  const items: WorkItem[] = [
+    {
+      id: 101,
+      title: "Epic One",
+      workItemType: "Epic",
+      state: "Active",
+      assignedTo: "A",
+      areaLevel4: "",
+      iterationLevel2: "",
+      risk: "",
+      riskAssessment: "",
+      url: "https://example.test/_workitems/edit/101",
+      relations: [
+        { rel: "Hyperlink", url: "https://issues.chromium.org/issues/123456" },
+        { rel: "Hyperlink", url: "https://issues.chromium.org/issues/123456" },
+        { rel: "Hyperlink", url: "https://example.com/not-a-crbug" },
+      ],
+    },
+  ];
+
+  assert.deepEqual(collectScenarioLinks(items), [
+    {
+      epicId: 101,
+      epicTitle: "Epic One",
+      epicState: "Active",
+      epicUrl: "https://example.test/_workitems/edit/101",
+      scenarios: [],
+      crBugs: [
+        { url: "https://issues.chromium.org/issues/123456", linkType: "hyperlink" },
+      ],
+    },
+  ]);
 });
 
 test("parseScenarioIdFromRelation handles Azure DevOps vstfs URLs", () => {
@@ -121,6 +188,125 @@ test("parseScenarioIdFromRelation handles Azure DevOps vstfs URLs", () => {
   ];
 
   assert.deepEqual(collectScenarioLinks(items), [
-    { epicId: 101, epicTitle: "Epic One", scenarioId: 201, linkType: "related" },
+    {
+      epicId: 101,
+      epicTitle: "Epic One",
+      epicState: "Active",
+      epicUrl: "https://example.test/_workitems/edit/101",
+      scenarios: [
+        { id: 201, url: "https://example.test/_workitems/edit/201", linkType: "related" },
+      ],
+      crBugs: [],
+    },
+  ]);
+});
+
+test("collectScenarioLinks includes Epics without a Scenario or CRBug", () => {
+  const items: WorkItem[] = [
+    {
+      id: 101,
+      title: "Epic One",
+      workItemType: "Epic",
+      state: "Active",
+      assignedTo: "A",
+      areaLevel4: "",
+      iterationLevel2: "",
+      risk: "",
+      riskAssessment: "",
+      url: "https://example.test/_workitems/edit/101",
+      relations: [{ rel: "System.LinkTypes.Related", url: "https://example.test/_apis/wit/workItems/201" }],
+    },
+  ];
+
+  assert.deepEqual(collectScenarioLinks(items), [
+    {
+      epicId: 101,
+      epicTitle: "Epic One",
+      epicState: "Active",
+      epicUrl: "https://example.test/_workitems/edit/101",
+      scenarios: [],
+      crBugs: [],
+    },
+  ]);
+});
+
+test("collectScenarioLinks limits rows to selected query child Epics", () => {
+  const childEpic: WorkItem = {
+    id: 101,
+    title: "Query Child Epic",
+    workItemType: "Epic",
+    state: "Active",
+    assignedTo: "A",
+    areaLevel4: "",
+    iterationLevel2: "",
+    risk: "",
+    riskAssessment: "",
+    parentId: 10,
+    url: "https://example.test/_workitems/edit/101",
+    relations: [],
+  };
+  const linkedEpic: WorkItem = {
+    ...childEpic,
+    id: 999,
+    title: "Fetched Epic Outside Query",
+    parentId: undefined,
+    url: "https://example.test/_workitems/edit/999",
+  };
+
+  assert.deepEqual(collectScenarioLinks([childEpic, linkedEpic], undefined, new Set([101])), [
+    {
+      epicId: 101,
+      epicTitle: "Query Child Epic",
+      epicState: "Active",
+      epicUrl: "https://example.test/_workitems/edit/101",
+      scenarios: [],
+      crBugs: [],
+    },
+  ]);
+});
+
+test("collectScenarioLinks reads the link list from the dedicated relation map", () => {
+  const items: WorkItem[] = [
+    {
+      id: 101,
+      title: "Epic One",
+      workItemType: "Epic",
+      state: "Active",
+      assignedTo: "A",
+      areaLevel4: "",
+      iterationLevel2: "",
+      risk: "",
+      riskAssessment: "",
+      url: "https://example.test/_workitems/edit/101",
+      relations: [],
+    },
+    {
+      id: 201,
+      title: "Scenario Alpha",
+      workItemType: "Scenario",
+      state: "Active",
+      assignedTo: "A",
+      areaLevel4: "",
+      iterationLevel2: "",
+      risk: "",
+      riskAssessment: "",
+      url: "https://example.test/_workitems/edit/201",
+      relations: [],
+    },
+  ];
+
+  const relationMap = new Map<number, WorkItemRelation[]>([[101, [{ rel: "System.LinkTypes.Related", url: "https://example.test/_apis/wit/workItems/201" }]]]);
+
+  assert.deepEqual(collectScenarioLinks(items, relationMap), [
+    {
+      epicId: 101,
+      epicTitle: "Epic One",
+      epicState: "Active",
+      epicUrl: "https://example.test/_workitems/edit/101",
+      scenarios: [
+        { id: 201, url: "https://example.test/_workitems/edit/201", linkType: "related" },
+      ],
+      crBugs: [],
+    },
   ]);
 });

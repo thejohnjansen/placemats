@@ -50,24 +50,27 @@ node dist/index.js "<ADO query URL>" --out placemat.pptx
 | Flag            | Description                                                       | Default         |
 | --------------- | ----------------------------------------------------------------- | --------------- |
 | `-o`, `--out`   | Output `.pptx` or `.md` file path                                 | `placemat.pptx` |
-| `--report`, `--md` | Generate a markdown epic-to-scenario link table instead of a PPTX |                 |
+| `--report`, `--md` | Generate a markdown Epic link table instead of a PPTX             |                 |
 | `-h`, `--help`  | Show help                                                         |                 |
 
-### One-off scenario link report
+### One-off Epic link report
 
-To generate a separate markdown report that checks each child Epic for a direct
-link to a Scenario and records the link type, run:
+To generate a separate markdown report that lists each child Epic and any direct
+links to Scenarios or CRBugs on `issues.chromium.org`, run:
 
 ```powershell
 npm run placemat -- "<ADO query URL>" --report --out scenario-links.md
 ```
 
-This writes a table like:
+This writes one row per Epic. Epic and Scenario IDs link to their Azure DevOps
+items, and multiple Scenario or CRBug links are listed within the same row.
+Epics without either kind of link are also included.
 
-| Epic ID | Epic Title | Scenario ID | Link Type |
-| ------- | ---------- | ----------- | --------- |
-| 12345   | Epic A     | 54321       | related   |
-| 12346   | Epic B     | 54322       | child     |
+| Epic ID | Epic Title | Scenario ID | CRBug                                      | Link Type         |
+| ------- | ---------- | ----------- | ------------------------------------------ | ----------------- |
+| 12345   | Epic A     | 54321       |                                            | related           |
+| 12346   | Epic B     |             | https://issues.chromium.org/issues/123456 | hyperlink         |
+| 12347   | Epic C     |             |                                            |                   |
 
 ### Query URL
 

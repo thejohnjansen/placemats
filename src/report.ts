@@ -1,10 +1,12 @@
-import { WorkItem } from "./types.js";
+import { WorkItem, WorkItemRelation } from "./types.js";
 
 export interface ScenarioLinkReportRow {
   epicId: number;
   epicTitle: string;
-  scenarioId: number;
-  linkType: string;
+  epicState: string;
+  epicUrl: string;
+  scenarios: Array<{ id: number; url: string; linkType: string }>;
+  crBugs: Array<{ url: string; linkType: string }>;
 }
 
 export function classifyLinkType(rel: string | undefined): string {
@@ -44,60 +46,123 @@ function parseScenarioIdFromRelation(relationUrl?: string): number | undefined {
   return match ? Number(match[1]) : undefined;
 }
 
-export function collectScenarioLinks(items: WorkItem[]): ScenarioLinkReportRow[] {
-  const rows: ScenarioLinkReportRow[] = [];
+function isChromiumIssueHyperlink(relation: WorkItemRelation): boolean {
+  if (relation.rel?.toLowerCase() !== "hyperlink" || !relation.url) {
+    return false;
+  }
+
+  try {
+    return new URL(relation.url).hostname.toLowerCase() === "issues.chromium.org";
+  } catch {
+    return false;
+  }
+}
+
+export function collectScenarioLinks(
+  items: WorkItem[],
+  relationMap?: Map<number, WorkItemRelation[]>,
+  reportEpicIds?: ReadonlySet<number>
+): ScenarioLinkReportRow[] {
+  const rows = new Map<number, ScenarioLinkReportRow>();
+  const itemLookup = new Map(items.map((item) => [item.id, item]));
 
   for (const item of items) {
-    if (!item.relations || item.relations.length === 0) continue;
-
     const itemType = item.workItemType?.toLowerCase() ?? "";
     if (itemType !== "epic" && itemType !== "") continue;
+    if (reportEpicIds && !reportEpicIds.has(item.id)) continue;
 
-    for (const relation of item.relations) {
+    const relations = relationMap?.get(item.id) ?? item.relations ?? [];
+    const row = rows.get(item.id) ?? {
+      epicId: item.id,
+      epicTitle: item.title,
+      epicState: item.state,
+      epicUrl: item.url,
+      scenarios: [],
+      crBugs: [],
+    };
+
+    for (const relation of relations) {
       const relationType = classifyLinkType(relation.rel);
+
+      if (isChromiumIssueHyperlink(relation)) {
+        if (!row.crBugs.some((crBug) => crBug.url === relation.url)) {
+          row.crBugs.push({ url: relation.url!, linkType: relationType });
+        }
+        continue;
+      }
+
       const scenarioId = parseScenarioIdFromRelation(relation.url);
       if (scenarioId === undefined) continue;
 
-      const scenario = items.find((wi) => wi.id === scenarioId);
-      if (!scenario) continue;
+      const linkedItem = itemLookup.get(scenarioId);
+      if (linkedItem?.workItemType.toLowerCase() !== "scenario") continue;
 
-      const scenarioType = scenario.workItemType?.toLowerCase() ?? "";
-      if (scenarioType !== "scenario") continue;
-
-      rows.push({
-        epicId: item.id,
-        epicTitle: item.title,
-        scenarioId: scenario.id,
-        linkType: relationType,
-      });
+      const existingScenario = row.scenarios.find((scenario) => scenario.id === scenarioId);
+      if (existingScenario) {
+        const linkTypes = new Set(existingScenario.linkType.split(" / "));
+        linkTypes.add(relationType);
+        existingScenario.linkType = [...linkTypes].join(" / ");
+      } else {
+        row.scenarios.push({
+          id: scenarioId,
+          url: linkedItem.url,
+          linkType: relationType,
+        });
+      }
     }
+
+    row.scenarios.sort((a, b) => a.id - b.id);
+    row.crBugs.sort((a, b) => a.url.localeCompare(b.url));
+    rows.set(item.id, row);
   }
 
-  return rows.sort((a, b) => a.epicId - b.epicId || a.scenarioId - b.scenarioId);
+  return [...rows.values()].sort((a, b) => a.epicId - b.epicId);
+}
+
+function escapeTableCell(value: string): string {
+  return value.replace(/\|/g, "\\|");
+}
+
+function crBugLabel(url: string): string {
+  try {
+    return new URL(url).pathname.split("/").filter(Boolean).pop() ?? url;
+  } catch {
+    return url;
+  }
 }
 
 export function buildScenarioReportMarkdown(rows: ScenarioLinkReportRow[]): string {
-  const header = "| Epic ID | Epic Title | Scenario ID | Link Type |";
-  const separator = "| --- | --- | --- | --- |";
+  const header = "| Epic ID | Epic Title | State | Scenario ID | CRBug | Link Type |";
+  const separator = "| --- | --- | --- | --- | --- | --- |";
 
   if (rows.length === 0) {
     return [
-      "# Epic-to-Scenario Link Report",
+      "# Epic Link Report",
       "",
       header,
       separator,
-      "| - | - | - | - |",
+      "| - | - | - | - | - | - |",
       "",
-      "No child Epic/Scenario links were found.",
+      "No Epic links to Scenarios or CRBugs were found.",
     ].join("\n");
   }
 
   const body = rows
-    .map(
-      (row) =>
-        `| ${row.epicId} | ${row.epicTitle.replace(/\|/g, "\\|")} | ${row.scenarioId} | ${row.linkType} |`
-    )
+    .map((row) => {
+      const epicId = `[${row.epicId}](${row.epicUrl})`;
+      const scenarios = row.scenarios
+        .map((scenario) => `[${scenario.id}](${scenario.url})`)
+        .join(", ");
+      const crBugs = row.crBugs
+        .map((crBug) => `[${escapeTableCell(crBugLabel(crBug.url))}](${crBug.url})`)
+        .join(", ");
+      const linkTypes = [...row.scenarios, ...row.crBugs]
+        .map((link) => link.linkType)
+        .join(", ");
+
+      return `| ${epicId} | ${escapeTableCell(row.epicTitle)} | ${escapeTableCell(row.epicState)} | ${scenarios} | ${crBugs} | ${linkTypes} |`;
+    })
     .join("\n");
 
-  return ["# Epic-to-Scenario Link Report", "", header, separator, body].join("\n");
+  return ["# Epic Link Report", "", header, separator, body].join("\n");
 }

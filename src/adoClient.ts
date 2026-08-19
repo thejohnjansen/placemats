@@ -45,6 +45,12 @@ interface RawWorkItem {
   }>;
 }
 
+function linkedWorkItemId(url: string | undefined): number | undefined {
+  if (!url) return undefined;
+  const match = url.match(/(?:\/workitems\/|\/workitem\/)(\d+)(?:$|[/?#])/i);
+  return match ? Number(match[1]) : undefined;
+}
+
 /** Return the segment of a tree path (Area/Iteration) at the given 0-based index (split on '/' or '\'). */
 function pathSegment(path: string | undefined, index: number): string {
   if (!path) return "";
@@ -150,6 +156,44 @@ export class AdoClient {
       }
     }
     return items;
+  }
+
+  /**
+   * Fetch each queried Epic's link collection, then fetch the linked work item
+   * details so the report can identify which targets are Scenarios.
+   */
+  async getWorkItemsForReport(ids: number[]): Promise<WorkItem[]> {
+    const queryItems = await this.getWorkItems(ids);
+    const reportItems = new Map(queryItems.map((item) => [item.id, item]));
+    const linkedIds = new Set<number>();
+
+    const epics = queryItems.filter(
+      (item) => item.workItemType.toLowerCase() === "epic"
+    );
+    for (const epic of epics) {
+      const path = `${this.projectSegment}/_apis/wit/workitems/${epic.id}?$expand=Relations&api-version=${API_VERSION}`;
+      const expanded = await this.get<RawWorkItem>(path);
+      const relations = expanded.relations ?? [];
+      reportItems.set(epic.id, { ...epic, relations });
+
+      for (const relation of relations) {
+        const linkedId = linkedWorkItemId(relation.url);
+        if (linkedId !== undefined && !reportItems.has(linkedId)) {
+          linkedIds.add(linkedId);
+        }
+      }
+    }
+
+    if (linkedIds.size > 0) {
+      const linkedItems = await this.getWorkItems([...linkedIds]);
+      for (const linkedItem of linkedItems) {
+        if (!reportItems.has(linkedItem.id)) {
+          reportItems.set(linkedItem.id, linkedItem);
+        }
+      }
+    }
+
+    return [...reportItems.values()];
   }
 
   private toWorkItem(raw: RawWorkItem): WorkItem {
