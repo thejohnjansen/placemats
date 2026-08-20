@@ -19,8 +19,8 @@ test("collectScenarioLinks finds scenario work item relations for child epics", 
       workItemType: "Epic",
       state: "Active",
       assignedTo: "A",
-      areaLevel4: "",
-      iterationLevel2: "",
+      areaLevel4: "Editing and Input",
+      iterationLevel2: "26-C4",
       risk: "",
       riskAssessment: "",
       parentId: 10,
@@ -48,8 +48,9 @@ test("collectScenarioLinks finds scenario work item relations for child epics", 
       workItemType: "Epic",
       state: "Active",
       assignedTo: "B",
-      areaLevel4: "",
-      iterationLevel2: "",
+      areaLevel4: "Graphics and Storage",
+      areaLevel5: "Paint",
+      iterationLevel2: "26-C5",
       risk: "",
       riskAssessment: "",
       parentId: 11,
@@ -75,6 +76,8 @@ test("collectScenarioLinks finds scenario work item relations for child epics", 
 
   assert.deepEqual(collectScenarioLinks([...items, items[0]]), [
     {
+      area: "Editing and Input",
+      iteration: "26-C4",
       epicId: 101,
       epicTitle: "Epic One",
       epicState: "Active",
@@ -85,6 +88,8 @@ test("collectScenarioLinks finds scenario work item relations for child epics", 
       crBugs: [],
     },
     {
+      area: "Graphics and Storage\\Paint",
+      iteration: "26-C5",
       epicId: 102,
       epicTitle: "Epic Two",
       epicState: "Active",
@@ -100,6 +105,8 @@ test("collectScenarioLinks finds scenario work item relations for child epics", 
 test("buildScenarioReportMarkdown renders linked IDs and multiple links on one row", () => {
   const markdown = buildScenarioReportMarkdown([
     {
+      area: "Graphics and Storage\\Paint",
+      iteration: "26-C4",
       epicId: 101,
       epicTitle: "Epic One",
       epicState: "Active",
@@ -115,11 +122,11 @@ test("buildScenarioReportMarkdown renders linked IDs and multiple links on one r
     },
   ]);
 
-  assert.match(markdown, /\| Epic ID \| Epic Title \| State \| Scenario ID \| CRBug \| Link Type \|/);
-  assert.match(markdown, /\| \[101\]\(https:\/\/example\.test\/_workitems\/edit\/101\) \| Epic One \| Active \|/);
+  assert.match(markdown, /\| Area \| Iteration \| Epic ID \| Epic Title \| State \| Scenario ID \| CRBug \| Link Type \|/);
+  assert.match(markdown, /\| Graphics and Storage\\Paint \| 26-C4 \| \[101\]\(https:\/\/example\.test\/_workitems\/edit\/101\) \| Epic One \| Active \|/);
   assert.match(markdown, /\[201\]\(https:\/\/example\.test\/_workitems\/edit\/201\), \[202\]\(https:\/\/example\.test\/_workitems\/edit\/202\)/);
   assert.match(markdown, /\[123456\]\(https:\/\/issues\.chromium\.org\/issues\/123456\), \[789012\]\(https:\/\/issues\.chromium\.org\/issues\/789012\)/);
-  assert.equal(markdown.split("\n").filter((line) => line.startsWith("| [101]")).length, 1);
+  assert.equal(markdown.split("\n").filter((line) => line.includes("| [101]")).length, 1);
 });
 
 test("collectScenarioLinks includes Chromium issue hyperlinks and ignores other hyperlinks", () => {
@@ -145,6 +152,8 @@ test("collectScenarioLinks includes Chromium issue hyperlinks and ignores other 
 
   assert.deepEqual(collectScenarioLinks(items), [
     {
+      area: "",
+      iteration: "",
       epicId: 101,
       epicTitle: "Epic One",
       epicState: "Active",
@@ -189,6 +198,8 @@ test("parseScenarioIdFromRelation handles Azure DevOps vstfs URLs", () => {
 
   assert.deepEqual(collectScenarioLinks(items), [
     {
+      area: "",
+      iteration: "",
       epicId: 101,
       epicTitle: "Epic One",
       epicState: "Active",
@@ -220,6 +231,8 @@ test("collectScenarioLinks includes Epics without a Scenario or CRBug", () => {
 
   assert.deepEqual(collectScenarioLinks(items), [
     {
+      area: "",
+      iteration: "",
       epicId: 101,
       epicTitle: "Epic One",
       epicState: "Active",
@@ -255,6 +268,8 @@ test("collectScenarioLinks limits rows to selected query child Epics", () => {
 
   assert.deepEqual(collectScenarioLinks([childEpic, linkedEpic], undefined, new Set([101])), [
     {
+      area: "",
+      iteration: "",
       epicId: 101,
       epicTitle: "Query Child Epic",
       epicState: "Active",
@@ -299,6 +314,8 @@ test("collectScenarioLinks reads the link list from the dedicated relation map",
 
   assert.deepEqual(collectScenarioLinks(items, relationMap), [
     {
+      area: "",
+      iteration: "",
       epicId: 101,
       epicTitle: "Epic One",
       epicState: "Active",

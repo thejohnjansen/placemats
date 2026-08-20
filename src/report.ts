@@ -1,6 +1,8 @@
 import { WorkItem, WorkItemRelation } from "./types.js";
 
 export interface ScenarioLinkReportRow {
+  area: string;
+  iteration: string;
   epicId: number;
   epicTitle: string;
   epicState: string;
@@ -73,6 +75,8 @@ export function collectScenarioLinks(
 
     const relations = relationMap?.get(item.id) ?? item.relations ?? [];
     const row = rows.get(item.id) ?? {
+      area: [item.areaLevel4, item.areaLevel5].filter(Boolean).join("\\"),
+      iteration: item.iterationLevel2,
       epicId: item.id,
       epicTitle: item.title,
       epicState: item.state,
@@ -132,8 +136,8 @@ function crBugLabel(url: string): string {
 }
 
 export function buildScenarioReportMarkdown(rows: ScenarioLinkReportRow[]): string {
-  const header = "| Epic ID | Epic Title | State | Scenario ID | CRBug | Link Type |";
-  const separator = "| --- | --- | --- | --- | --- | --- |";
+  const header = "| Area | Iteration | Epic ID | Epic Title | State | Scenario ID | CRBug | Link Type |";
+  const separator = "| --- | --- | --- | --- | --- | --- | --- | --- |";
 
   if (rows.length === 0) {
     return [
@@ -141,7 +145,7 @@ export function buildScenarioReportMarkdown(rows: ScenarioLinkReportRow[]): stri
       "",
       header,
       separator,
-      "| - | - | - | - | - | - |",
+      "| - | - | - | - | - | - | - | - |",
       "",
       "No Epic links to Scenarios or CRBugs were found.",
     ].join("\n");
@@ -160,7 +164,7 @@ export function buildScenarioReportMarkdown(rows: ScenarioLinkReportRow[]): stri
         .map((link) => link.linkType)
         .join(", ");
 
-      return `| ${epicId} | ${escapeTableCell(row.epicTitle)} | ${escapeTableCell(row.epicState)} | ${scenarios} | ${crBugs} | ${linkTypes} |`;
+      return `| ${escapeTableCell(row.area)} | ${escapeTableCell(row.iteration)} | ${epicId} | ${escapeTableCell(row.epicTitle)} | ${escapeTableCell(row.epicState)} | ${scenarios} | ${crBugs} | ${linkTypes} |`;
     })
     .join("\n");
 

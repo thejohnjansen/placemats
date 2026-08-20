@@ -209,6 +209,7 @@ export class AdoClient {
       state: f["System.State"] ?? "",
       assignedTo: f["System.AssignedTo"]?.displayName ?? "Unassigned",
       areaLevel4: pathSegment(f["System.AreaPath"], 3),
+      areaLevel5: pathSegment(f["System.AreaPath"], 4),
       iterationLevel2: pathSegment(f["System.IterationPath"], 1),
       risk: (f["OSG.RiskAssessment"] ?? "").trim(),
       riskAssessment: stripHtml(f["OSG.RiskAssessmentComment"]),

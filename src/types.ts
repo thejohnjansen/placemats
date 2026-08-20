@@ -31,6 +31,8 @@ export interface WorkItem {
   assignedTo: string;
   /** The 4th segment of the Area Path (0-based index 3), if present. */
   areaLevel4: string;
+  /** The 5th segment of the Area Path (0-based index 4), if present. */
+  areaLevel5?: string;
   /** The 2nd segment of the Iteration Path (0-based index 1), if present. */
   iterationLevel2: string;
   /** Risk level from the ADO Risk Assessment field. */
