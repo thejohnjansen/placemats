@@ -2,8 +2,9 @@
 
 Generate a "placemat" PowerPoint presentation from an Azure DevOps (ADO) work item query.
 
-Each slide represents a **parent Epic and team** and contains a table of its
-**child Epics** for that team:
+The default layout creates a slide for each **parent Epic and team**. An
+optional layout combines every team onto one slide per **parent Epic**. Each
+slide contains a table of its **child Epics**:
 
 | Title (linked to the Epic) | Assigned To | State | Risk | Risk Assessment |
 | -------------------------- | ----------- | ----- | ---- | --------------- |
@@ -38,6 +39,13 @@ Run directly with the TypeScript runner:
 npm run placemat -- "<ADO query URL>" --out placemat.pptx
 ```
 
+By default, a parent Epic gets a separate slide for each team. To combine all
+teams onto exactly one slide per parent Epic, run:
+
+```powershell
+npm run placemat -- "<ADO query URL>" --one-slide-per-parent --out placemat.pptx
+```
+
 Or build once and run the compiled CLI:
 
 ```powershell
@@ -49,8 +57,9 @@ node dist/index.js "<ADO query URL>" --out placemat.pptx
 
 | Flag            | Description                                                       | Default         |
 | --------------- | ----------------------------------------------------------------- | --------------- |
-| `-o`, `--out`   | Output `.pptx` or `.md` file path                                 | `placemat.pptx` |
+| `-o`, `--out`   | Output `.pptx` or `.md` file path | `placemat.pptx` or `scenario-links.md` in report mode |
 | `--report`, `--md` | Generate a markdown Epic link table instead of a PPTX             |                 |
+| `--one-slide-per-parent` | Combine all teams onto exactly one slide per parent Epic |                 |
 | `-h`, `--help`  | Show help                                                         |                 |
 
 ### One-off Epic link report
@@ -59,8 +68,11 @@ To generate a separate markdown report that lists each child Epic and any direct
 links to Scenarios or CRBugs on `issues.chromium.org`, run:
 
 ```powershell
-npm run placemat -- "<ADO query URL>" --report --out scenario-links.md
+npm run placemat -- "<ADO query URL>" --report
 ```
+
+This writes `scenario-links.md` by default. Use `--out <file.md>` to choose a
+different path.
 
 This writes one row per Epic. Epic and Scenario IDs link to their Azure DevOps
 items, and multiple Scenario or CRBug links are listed within the same row.
@@ -91,9 +103,9 @@ The tool extracts the organization, project, and query id automatically.
 3. Runs the stored query (WIQL) to get the work item ids.
 4. Fetches Title, Assigned To, State, and Parent for each item.
 5. Groups items into parent Epics with their child Epics (via `System.Parent`).
-6. Splits each parent's children into team-specific tables and builds the slides
-  in team order. Long tables flow onto additional slides automatically,
-  repeating the header row.
+6. Builds team-specific slides in team order, or combines all teams onto one
+  slide per parent when `--one-slide-per-parent` is used. In the default mode,
+  long tables flow onto additional slides automatically and repeat the header.
 
 ## Notes
 

@@ -77,10 +77,17 @@ const COLUMNS = [
 ];
 const COL_WIDTHS = [1, 1.25, 3.2, 1.8, 1.3, 0.9, 3.5];
 
+export interface PresentationOptions {
+  oneSlidePerParent?: boolean;
+}
+
 /**
  * Build a placemat presentation with team-specific slides for each parent Epic.
  */
-export function buildPresentation(groups: EpicGroup[]): pptxgen {
+export function buildPresentation(
+  groups: EpicGroup[],
+  options: PresentationOptions = {}
+): pptxgen {
   const pptx = new pptxgen();
   pptx.layout = "LAYOUT_WIDE";
   pptx.author = "ADO Placemat";
@@ -100,12 +107,25 @@ export function buildPresentation(groups: EpicGroup[]): pptxgen {
     return pptx;
   }
 
-  for (const group of splitGroupsByTeam(groups)) {
-    const pages = chunk(group.children, rowsPerPage(group.children.length));
+  const presentationGroups = options.oneSlidePerParent
+    ? groups
+    : splitGroupsByTeam(groups);
+
+  for (const group of presentationGroups) {
+    const pages = options.oneSlidePerParent
+      ? [group.children]
+      : chunk(group.children, rowsPerPage(group.children.length));
     // Ensure a parent with no children still produces a single (empty) slide.
     const effectivePages = pages.length > 0 ? pages : [[]];
     effectivePages.forEach((children, index) => {
-      addEpicSlide(pptx, group, children, index, effectivePages.length);
+      addEpicSlide(
+        pptx,
+        group,
+        children,
+        index,
+        effectivePages.length,
+        options.oneSlidePerParent ?? false
+      );
     });
   }
   return pptx;
@@ -162,7 +182,8 @@ function addEpicSlide(
   group: EpicGroup,
   children: EpicGroup["children"],
   pageIndex: number,
-  pageCount: number
+  pageCount: number,
+  fitOnSingleSlide: boolean
 ): void {
   const slide = pptx.addSlide();
 
@@ -238,14 +259,21 @@ function addEpicSlide(
     ];
   });
 
+  const rowHeight = fitOnSingleSlide
+    ? Math.min(0.5, 5.5 / Math.max(children.length + 1, 1))
+    : 0.5;
+  const fontSize = fitOnSingleSlide
+    ? Math.max(6, Math.min(12, rowHeight * 24))
+    : 12;
+
   slide.addTable([headerRow, ...bodyRows], {
     x: 0.2,
     y: 1.5,
     w: 12.53,
     colW: COL_WIDTHS,
-    rowH: 0.5,
+    rowH: rowHeight,
     border: { type: "solid", color: BORDER_COLOR, pt: 1 },
-    fontSize: 12,
+    fontSize,
     fontFace: FONT_FACE,
     color: "000000",
     valign: "middle",

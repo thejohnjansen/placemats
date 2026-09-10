@@ -5,35 +5,7 @@ import { groupEpics } from "./hierarchy.js";
 import { buildPresentation } from "./placemat.js";
 import { buildScenarioReportMarkdown, collectScenarioLinks } from "./report.js";
 import { writeFile } from "node:fs/promises";
-
-interface CliArgs {
-  queryUrl: string;
-  out: string;
-  reportOnly: boolean;
-}
-
-function parseArgs(argv: string[]): CliArgs | null {
-  const args = argv.slice(2);
-  let queryUrl: string | undefined;
-  let out = "placemat.pptx";
-  let reportOnly = false;
-
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg === "--out" || arg === "-o") {
-      out = args[++i] ?? out;
-    } else if (arg === "--report" || arg === "--md") {
-      reportOnly = true;
-    } else if (arg === "--help" || arg === "-h") {
-      return null;
-    } else if (!queryUrl) {
-      queryUrl = arg;
-    }
-  }
-
-  if (!queryUrl) return null;
-  return { queryUrl, out, reportOnly };
-}
+import { parseArgs } from "./cliArgs.js";
 
 function printUsage(): void {
   console.log(
@@ -45,8 +17,9 @@ function printUsage(): void {
       '  placemat "<ADO query URL>" --report [--out <file.md>]',
       "",
       "Options:",
-      "  -o, --out <file>   Output .pptx or .md path (default: placemat.pptx)",
+      "  -o, --out <file>   Output path (default: placemat.pptx or scenario-links.md)",
       "  --report, --md     Generate a markdown epic-to-scenario link report instead of a PPTX",
+      "  --one-slide-per-parent  Combine all teams onto one slide per parent Epic",
       "  -h, --help         Show this help",
       "",
       "Authentication uses the Azure CLI. Run 'az login' first.",
@@ -112,7 +85,9 @@ async function main(): Promise<void> {
     `Found ${groups.length} parent Epic(s) with child Epics.`
   );
 
-  const pptx = buildPresentation(groups);
+  const pptx = buildPresentation(groups, {
+    oneSlidePerParent: parsed.oneSlidePerParent,
+  });
   const fileName = await pptx.writeFile({ fileName: parsed.out });
   console.log(`Wrote ${fileName}`);
 }
